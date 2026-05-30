@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fridge to Fork — AI Recipe Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream:       #faf6ef;
+    --parchment:   #f0e6d3;
+    --sand:        #e8d5b7;
+    --tan:         #c9a87c;
+    --brown-light: #a0714f;
+    --brown:       #7a4f35;
+    --brown-dark:  #5c3a24;
+    --espresso:    #3d2314;
+    --text:        #3d2b1f;
+    --muted:       #9b7d6a;
+    --white:       #fffdf8;
+    --vegan:       #4a7c59;
+    --vegan-light: #d4edda;
+    --serif:       'Playfair Display', Georgia, serif;
+    --sans:        'Lato', sans-serif;
+    --radius:      12px;
+    --shadow:      0 4px 24px rgba(92,58,36,0.12);
+    --shadow-lg:   0 8px 40px rgba(92,58,36,0.18);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--cream);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    background-image: radial-gradient(ellipse 80% 40% at 50% 0%, rgba(201,168,124,0.15) 0%, transparent 60%);
+  }
+
+  /* ── Navbar ── */
+  nav {
+    background: var(--espresso);
+    padding: 0 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.3);
+  }
+  .nav-brand { font-family: var(--serif); font-size: 1.4em; color: var(--parchment); letter-spacing: 1px; }
+  .nav-brand span { color: var(--tan); font-style: italic; }
+  .nav-links { display: flex; gap: 6px; }
+  .nav-btn {
+    padding: 8px 18px; background: none; border: 1px solid transparent;
+    border-radius: 8px; color: rgba(240,230,211,0.7); font-family: var(--sans);
+    font-size: 0.88em; font-weight: 400; cursor: pointer; transition: all 0.25s; letter-spacing: 0.5px;
+  }
+  .nav-btn:hover { color: var(--parchment); border-color: rgba(240,230,211,0.2); }
+  .nav-btn.active { background: var(--brown); color: var(--parchment); border-color: var(--brown); }
+
+  /* ── Hero ── */
+  .hero { text-align: center; padding: 60px 20px 40px; animation: fadeUp 0.6s ease both; }
+  .hero-eyebrow { font-size: 0.78em; letter-spacing: 3px; text-transform: uppercase; color: var(--tan); margin-bottom: 14px; }
+  .hero h1 { font-family: var(--serif); font-size: clamp(2em, 5vw, 3.2em); color: var(--espresso); line-height: 1.2; margin-bottom: 16px; font-weight: 600; }
+  .hero h1 em { color: var(--brown-light); font-style: italic; }
+  .hero p { color: var(--muted); font-size: 1.05em; max-width: 500px; margin: 0 auto; line-height: 1.7; font-weight: 300; }
+
+  /* ── Layout ── */
+  .wrapper { max-width: 1100px; margin: 0 auto; padding: 0 24px 80px; }
+  .panel { display: none; animation: fadeUp 0.4s ease both; }
+  .panel.active { display: block; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ── Cards ── */
+  .card { background: var(--white); border: 1px solid var(--sand); border-radius: var(--radius); padding: 30px; box-shadow: var(--shadow); }
+  .card-title { font-family: var(--serif); font-size: 1.3em; color: var(--espresso); margin-bottom: 6px; }
+  .card-sub { color: var(--muted); font-size: 0.88em; margin-bottom: 24px; line-height: 1.5; }
+
+  /* ── Form Elements ── */
+  .field { margin-bottom: 18px; }
+  .field label { display: block; font-size: 0.82em; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--brown); margin-bottom: 8px; }
+  .field input, .field textarea, .field select {
+    width: 100%; padding: 12px 16px; background: var(--cream); border: 1.5px solid var(--sand);
+    border-radius: 8px; font-family: var(--sans); font-size: 0.95em; color: var(--text);
+    transition: border-color 0.2s, box-shadow 0.2s; outline: none; appearance: none;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus {
+    border-color: var(--brown-light); box-shadow: 0 0 0 3px rgba(160,113,79,0.12); background: var(--white);
+  }
+  .field input::placeholder, .field textarea::placeholder { color: var(--muted); opacity: 0.7; }
+  .field textarea { resize: none; height: 80px; line-height: 1.6; }
+  .fields-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 580px) { .fields-row { grid-template-columns: 1fr; } }
+
+  /* ── Ingredient Input with Suggestions ── */
+  .ingredient-input-wrap { position: relative; }
+  .ingredient-input-wrap input { padding-right: 40px; }
+
+  .suggestions-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--white);
+    border: 1.5px solid var(--sand);
+    border-radius: 10px;
+    box-shadow: var(--shadow-lg);
+    z-index: 50;
+    display: none;
+    overflow: hidden;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .suggestions-dropdown.open { display: block; animation: fadeUp 0.2s ease both; }
+
+  .suggestion-section { padding: 10px 0 4px; }
+  .suggestion-section-title {
+    font-size: 0.68em; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--tan); padding: 0 14px 6px; font-weight: 700;
+  }
+  .suggestion-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 14px; cursor: pointer; transition: background 0.15s;
+    font-size: 0.88em; color: var(--text);
+  }
+  .suggestion-item:hover { background: var(--parchment); }
+  .suggestion-item .sug-icon { font-size: 1.1em; width: 24px; text-align: center; }
+  .suggestion-item .sug-text { flex: 1; }
+  .suggestion-item .sug-why { font-size: 0.75em; color: var(--muted); }
+  .suggestion-item .sug-add {
+    font-size: 0.72em; background: var(--parchment); color: var(--brown);
+    padding: 2px 8px; border-radius: 10px; white-space: nowrap;
+  }
+  .suggestion-divider { height: 1px; background: var(--parchment); margin: 4px 0; }
+
+  /* Tag pills for added ingredients */
+  .ingredient-tags {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    min-height: 36px; padding: 8px 12px;
+    background: var(--cream); border: 1.5px solid var(--sand);
+    border-radius: 8px; cursor: text; transition: border-color 0.2s;
+    align-items: center;
+  }
+  .ingredient-tags:focus-within { border-color: var(--brown-light); box-shadow: 0 0 0 3px rgba(160,113,79,0.12); }
+  .tag-pill {
+    display: flex; align-items: center; gap: 5px;
+    background: var(--brown); color: var(--parchment);
+    padding: 3px 10px; border-radius: 20px; font-size: 0.8em;
+    animation: popIn 0.2s ease;
+  }
+  @keyframes popIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+  .tag-pill .remove { cursor: pointer; opacity: 0.7; font-size: 0.9em; line-height: 1; }
+  .tag-pill .remove:hover { opacity: 1; }
+  .tag-input-field {
+    border: none !important; background: none !important; outline: none !important;
+    box-shadow: none !important; padding: 2px 4px !important;
+    min-width: 120px; flex: 1; font-size: 0.9em; color: var(--text);
+  }
+
+  /* ── Vegan Toggle ── */
+  .vegan-toggle-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px; background: var(--vegan-light);
+    border: 1.5px solid rgba(74,124,89,0.3); border-radius: 8px;
+    margin-bottom: 18px; cursor: pointer; transition: all 0.2s;
+  }
+  .vegan-toggle-row:hover { border-color: var(--vegan); }
+  .vegan-toggle-row.active { background: rgba(74,124,89,0.15); border-color: var(--vegan); }
+
+  .vegan-switch {
+    width: 40px; height: 22px; background: #ccc; border-radius: 11px;
+    position: relative; transition: background 0.3s; flex-shrink: 0;
+  }
+  .vegan-switch::after {
+    content: ''; position: absolute; width: 16px; height: 16px;
+    background: white; border-radius: 50%; top: 3px; left: 3px;
+    transition: transform 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .vegan-toggle-row.active .vegan-switch { background: var(--vegan); }
+  .vegan-toggle-row.active .vegan-switch::after { transform: translateX(18px); }
+
+  .vegan-label { flex: 1; }
+  .vegan-label strong { font-size: 0.88em; color: var(--vegan); display: block; }
+  .vegan-label small { font-size: 0.75em; color: var(--muted); }
+  .vegan-badge {
+    background: var(--vegan); color: white; font-size: 0.7em; font-weight: 700;
+    padding: 2px 8px; border-radius: 10px; letter-spacing: 0.5px;
+  }
+
+  /* ── Buttons ── */
+  .btn { padding: 13px 24px; border: none; border-radius: 8px; font-family: var(--sans); font-weight: 700; font-size: 0.9em; letter-spacing: 0.5px; cursor: pointer; transition: all 0.25s; display: inline-flex; align-items: center; gap: 8px; }
+  .btn-primary { background: var(--brown); color: var(--parchment); width: 100%; justify-content: center; box-shadow: 0 4px 14px rgba(122,79,53,0.3); }
+  .btn-primary:hover:not(:disabled) { background: var(--brown-dark); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(122,79,53,0.4); }
+  .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  .btn-primary.vegan-mode { background: var(--vegan); box-shadow: 0 4px 14px rgba(74,124,89,0.3); }
+  .btn-primary.vegan-mode:hover:not(:disabled) { background: #3a6147; box-shadow: 0 6px 20px rgba(74,124,89,0.4); }
+  .btn-outline { background: none; border: 1.5px solid var(--brown-light); color: var(--brown-light); padding: 9px 18px; font-size: 0.82em; }
+  .btn-outline:hover { background: var(--parchment); }
+  .btn-ghost { background: none; border: none; color: var(--muted); padding: 6px 10px; font-size: 0.82em; }
+  .btn-ghost:hover { color: var(--brown); }
+  .btn-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; padding: 8px 14px; font-size: 0.82em; }
+  .btn-danger:hover { background: #fecaca; }
+
+  /* ── Recipe Layout ── */
+  .recipe-layout { display: grid; grid-template-columns: 360px 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 780px) { .recipe-layout { grid-template-columns: 1fr; } }
+
+  .quick-label { font-size: 0.75em; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+  .chip { padding: 5px 12px; background: var(--parchment); border: 1px solid var(--sand); border-radius: 20px; font-size: 0.78em; color: var(--brown); cursor: pointer; transition: all 0.2s; }
+  .chip:hover { background: var(--sand); border-color: var(--tan); }
+  .chip.vegan-chip { background: rgba(74,124,89,0.1); border-color: rgba(74,124,89,0.3); color: var(--vegan); }
+  .chip.vegan-chip:hover { background: rgba(74,124,89,0.2); }
+
+  .results-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 380px; color: var(--muted); text-align: center; gap: 12px; }
+  .results-empty .big { font-size: 3.5rem; opacity: 0.3; }
+  .results-empty p { font-family: var(--serif); font-size: 1.1em; font-style: italic; max-width: 240px; line-height: 1.6; }
+
+  /* ── Recipe Card ── */
+  .recipes-grid { display: flex; flex-direction: column; gap: 20px; }
+  .recipe-card { background: var(--white); border: 1px solid var(--sand); border-radius: 10px; overflow: hidden; transition: all 0.25s; box-shadow: var(--shadow); }
+  .recipe-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+  .recipe-card.is-vegan { border-color: rgba(74,124,89,0.3); }
+
+  .recipe-card-header { background: var(--espresso); padding: 16px 20px; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .recipe-card.is-vegan .recipe-card-header { background: #2d5a3d; }
+  .recipe-card-header h3 { font-family: var(--serif); font-size: 1.15em; color: var(--parchment); line-height: 1.3; }
+  .recipe-meta { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+  .meta-pill { background: rgba(255,255,255,0.12); color: var(--sand); padding: 3px 10px; border-radius: 20px; font-size: 0.72em; white-space: nowrap; }
+  .meta-pill.vegan-pill { background: rgba(74,124,89,0.5); color: #a8d5b5; }
+
+  .recipe-card-body { padding: 18px 20px; }
+
+  .recipe-section { margin-bottom: 14px; }
+  .recipe-section-title { font-size: 0.72em; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--brown-light); margin-bottom: 8px; }
+
+  .ingredients-list { display: flex; flex-wrap: wrap; gap: 5px; }
+  .ingredient-tag { background: var(--parchment); border: 1px solid var(--sand); color: var(--brown); padding: 3px 10px; border-radius: 20px; font-size: 0.78em; }
+
+  .steps-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .steps-list li { display: flex; gap: 10px; font-size: 0.88em; line-height: 1.5; color: var(--text); }
+  .step-num { background: var(--brown); color: white; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7em; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .recipe-card.is-vegan .step-num { background: var(--vegan); }
+
+  .tip-box { background: var(--parchment); border-left: 3px solid var(--tan); padding: 10px 14px; font-size: 0.84em; color: var(--brown); border-radius: 0 6px 6px 0; font-style: italic; }
+
+  /* ── Nutrition Panel ── */
+  .nutrition-panel {
+    background: linear-gradient(135deg, #fdf8f2 0%, #f5ede0 100%);
+    border: 1px solid var(--sand);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin: 14px 0;
+  }
+  .nutrition-panel.vegan-nutrition {
+    background: linear-gradient(135deg, #f0f9f4 0%, #e8f5ed 100%);
+    border-color: rgba(74,124,89,0.3);
+  }
+  .nutrition-title {
+    font-size: 0.72em; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--brown-light); margin-bottom: 14px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .nutrition-panel.vegan-nutrition .nutrition-title { color: var(--vegan); }
+
+  .nutrition-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  @media (max-width: 600px) { .nutrition-grid { grid-template-columns: repeat(3, 1fr); } }
+
+  .nutrient-item { text-align: center; }
+  .nutrient-bar-wrap { height: 4px; background: var(--sand); border-radius: 2px; margin-bottom: 6px; overflow: hidden; }
+  .nutrient-bar { height: 100%; border-radius: 2px; transition: width 1s ease 0.3s; }
+  .bar-cal   { background: #d4845a; }
+  .bar-prot  { background: #5a8bd4; }
+  .bar-carb  { background: #d4c05a; }
+  .bar-fat   { background: #d45a5a; }
+  .bar-fiber { background: #5ad47c; }
+
+  .nutrient-value { font-size: 1em; font-weight: 700; color: var(--espresso); line-height: 1; }
+  .nutrient-label { font-size: 0.65em; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 3px; }
+
+  .nutrition-dv {
+    margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--sand);
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+  .dv-tag {
+    font-size: 0.7em; padding: 2px 10px; border-radius: 10px;
+    background: var(--parchment); color: var(--brown); border: 1px solid var(--sand);
+  }
+  .dv-tag.good { background: rgba(74,124,89,0.12); color: var(--vegan); border-color: rgba(74,124,89,0.25); }
+  .dv-tag.warn { background: rgba(212,132,90,0.12); color: #c06030; border-color: rgba(212,132,90,0.3); }
+
+  .recipe-card-footer { padding: 12px 20px; border-top: 1px solid var(--parchment); display: flex; justify-content: space-between; align-items: center; }
+  .footer-left { display: flex; align-items: center; gap: 10px; }
+
+  /* ── Saved panel ── */
+  .saved-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .saved-card { background: var(--white); border: 1px solid var(--sand); border-radius: 10px; padding: 20px; box-shadow: var(--shadow); transition: all 0.25s; }
+  .saved-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+  .saved-card.vegan-saved { border-color: rgba(74,124,89,0.3); }
+  .saved-card h3 { font-family: var(--serif); font-size: 1.1em; color: var(--espresso); margin-bottom: 8px; line-height: 1.3; }
+  .saved-card-meta { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .saved-meta-badge { background: var(--parchment); color: var(--brown); padding: 2px 10px; border-radius: 20px; font-size: 0.72em; border: 1px solid var(--sand); }
+  .saved-meta-badge.vegan-badge { background: rgba(74,124,89,0.12); color: var(--vegan); border-color: rgba(74,124,89,0.25); }
+  .saved-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--parchment); }
+  .saved-date { font-size: 0.75em; color: var(--muted); }
+  .empty-saved { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty-saved .big { font-size: 3rem; margin-bottom: 12px; opacity: 0.4; }
+  .empty-saved p { font-family: var(--serif); font-style: italic; }
+
+  /* ── Menu panel ── */
+  .menu-layout { display: grid; grid-template-columns: 300px 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 780px) { .menu-layout { grid-template-columns: 1fr; } }
+  .week-title { font-family: var(--serif); font-size: 1.2em; color: var(--espresso); margin-bottom: 14px; padding-bottom: 8px; border-bottom: 2px solid var(--sand); display: flex; align-items: center; gap: 8px; }
+  .plan-table { width: 100%; border-collapse: collapse; border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); margin-bottom: 24px; }
+  .plan-table th { background: var(--espresso); color: var(--sand); padding: 10px 14px; font-size: 0.75em; text-transform: uppercase; letter-spacing: 1px; text-align: left; font-weight: 600; }
+  .plan-table td { padding: 12px 14px; font-size: 0.88em; border-bottom: 1px solid var(--parchment); vertical-align: top; line-height: 1.4; }
+  .plan-table tr:last-child td { border-bottom: none; }
+  .plan-table tr:nth-child(even) td { background: var(--cream); }
+  .plan-table td:first-child { font-weight: 700; color: var(--brown); white-space: nowrap; background: var(--parchment) !important; font-size: 0.82em; }
+  .shopping-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 580px) { .shopping-cols { grid-template-columns: 1fr; } }
+  .shopping-card { background: var(--white); border: 1px solid var(--sand); border-radius: 10px; padding: 18px; }
+  .shopping-card h4 { font-family: var(--serif); color: var(--brown-dark); margin-bottom: 12px; font-size: 0.95em; }
+  .shopping-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--parchment); font-size: 0.85em; color: var(--text); }
+  .shopping-item:last-child { border-bottom: none; }
+  .shopping-check { width: 16px; height: 16px; border: 1.5px solid var(--tan); border-radius: 3px; flex-shrink: 0; cursor: pointer; transition: all 0.2s; }
+  .shopping-check.checked { background: var(--brown); border-color: var(--brown); }
+  .tip-item { background: var(--parchment); border-left: 3px solid var(--tan); padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 10px; font-size: 0.88em; line-height: 1.6; color: var(--brown-dark); font-style: italic; }
+  .email-section { margin-top: 20px; padding: 20px; background: var(--parchment); border-radius: 10px; border: 1px solid var(--sand); }
+  .email-section h4 { font-family: var(--serif); color: var(--espresso); margin-bottom: 6px; }
+  .email-section p { font-size: 0.82em; color: var(--muted); margin-bottom: 14px; }
+  .email-row { display: flex; gap: 10px; }
+  .email-row input { flex: 1; padding: 10px 14px; background: var(--white); border: 1.5px solid var(--sand); border-radius: 8px; font-family: var(--sans); font-size: 0.9em; color: var(--text); outline: none; transition: border-color 0.2s; }
+  .email-row input:focus { border-color: var(--brown-light); }
+  .auto-schedule { margin-top: 12px; font-size: 0.78em; color: var(--muted); }
+
+  /* ── Toast ── */
+  .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--espresso); color: var(--parchment); padding: 12px 24px; border-radius: 30px; font-size: 0.88em; opacity: 0; transition: all 0.35s; z-index: 999; white-space: nowrap; pointer-events: none; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; gap: 16px; color: var(--muted); }
+  .loading-state .spin-big { width: 40px; height: 40px; border: 3px solid var(--sand); border-top-color: var(--brown); border-radius: 50%; animation: spin 0.9s linear infinite; }
+  .loading-state p { font-family: var(--serif); font-size: 1em; font-style: italic; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">🍽️ Fridge to <span>Fork</span></div>
+  <div class="nav-links">
+    <button class="nav-btn active" onclick="showPanel('recipes', this)">Find Recipes</button>
+    <button class="nav-btn" onclick="showPanel('menu', this)">2-Week Menu</button>
+    <button class="nav-btn" onclick="showPanel('saved', this)">Saved ♥</button>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="hero-eyebrow">AI-Powered Kitchen Assistant</div>
+  <h1>Turn your leftovers into<br><em>something delicious</em></h1>
+  <p>Type what's in your fridge. Get smart ingredient suggestions, full nutrition info, and 3 perfect recipes instantly.</p>
+</div>
+
+<div class="wrapper">
+
+  <!-- RECIPES PANEL -->
+  <div class="panel active" id="panel-recipes">
+    <div class="recipe-layout">
+
+      <!-- Form -->
+      <div class="card">
+        <div class="card-title">What's in your fridge?</div>
+        <div class="card-sub">Type ingredients — we'll suggest what pairs well as you go.</div>
+
+        <!-- Quick chips -->
+        <div class="quick-label">Quick load:</div>
+        <div class="chips">
+          <div class="chip" onclick="loadPreset(['rice','eggs','onion','tomato'])">🍳 Rice + Eggs</div>
+          <div class="chip" onclick="loadPreset(['bread','cheese','butter','garlic'])">🧀 Bread + Cheese</div>
+          <div class="chip" onclick="loadPreset(['paneer','spinach','tomato','onion'])">🥬 Paneer + Spinach</div>
+          <div class="chip" onclick="loadPreset(['pasta','tomato','garlic','basil'])">🍝 Pasta</div>
+          <div class="chip vegan-chip" onclick="loadPreset(['tofu','broccoli','soy sauce','ginger'])">🌱 Tofu Bowl</div>
+          <div class="chip vegan-chip" onclick="loadPreset(['chickpea','lemon','tahini','garlic'])">🧆 Hummus Plate</div>
+        </div>
+
+        <!-- Tag ingredient input -->
+        <div class="field">
+          <label>Ingredients</label>
+          <div style="position:relative;">
+            <div class="ingredient-tags" id="tag-container" onclick="focusTagInput()">
+              <input
+                type="text"
+                class="tag-input-field"
+                id="tag-input"
+                placeholder="Type an ingredient..."
+                oninput="handleIngredientInput(this.value)"
+                onkeydown="handleIngredientKeydown(event)"
+                onblur="hideSuggestionsDelayed()"
+                autocomplete="off"
+              />
+            </div>
+            <!-- Suggestions dropdown -->
+            <div class="suggestions-dropdown" id="suggestions-box"></div>
+          </div>
+        </div>
+
+        <!-- Options row -->
+        <div class="fields-row">
+          <div class="field">
+            <label>Cuisine</label>
+            <select id="cuisine">
+              <option value="Any">Any cuisine</option>
+              <option value="Indian">Indian</option>
+              <option value="Italian">Italian</option>
+              <option value="Chinese">Chinese</option>
+              <option value="Mexican">Mexican</option>
+              <option value="Mediterranean">Mediterranean</option>
+              <option value="Japanese">Japanese</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Max time</label>
+            <select id="maxTime">
+              <option value="15 mins">Under 15 mins</option>
+              <option value="30 mins" selected>Under 30 mins</option>
+              <option value="45 mins">Under 45 mins</option>
+              <option value="60 mins">Under 1 hour</option>
+              <option value="No limit">No limit</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Vegan toggle -->
+        <div class="vegan-toggle-row" id="vegan-toggle" onclick="toggleVegan()">
+          <div class="vegan-switch"></div>
+          <div class="vegan-label">
+            <strong>🌱 Vegan Mode</strong>
+            <small>Only plant-based recipes, no meat, dairy or eggs</small>
+          </div>
+          <div class="vegan-badge" id="vegan-status">OFF</div>
+        </div>
+
+        <button class="btn btn-primary" id="find-btn" onclick="findRecipes()">
+          <span id="find-btn-text">🔍 Find Recipes</span>
+        </button>
+      </div>
+
+      <!-- Results -->
+      <div id="results-area">
+        <div class="card results-empty">
+          <div class="big">🥘</div>
+          <p>Your recipes will appear here</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MENU PANEL -->
+  <div class="panel" id="panel-menu">
+    <div class="menu-layout">
+      <div>
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-title">Generate Menu</div>
+          <div class="card-sub">Get a personalised 2-week meal plan sent to your inbox.</div>
+          <div class="field">
+            <label>Dietary preference</label>
+            <select id="diet-pref">
+              <option value="balanced and healthy">Balanced & Healthy</option>
+              <option value="vegetarian">Vegetarian</option>
+              <option value="vegan, fully plant-based">🌱 Vegan</option>
+              <option value="high protein">High Protein</option>
+              <option value="low carb">Low Carb</option>
+              <option value="Indian cuisine">Indian Cuisine</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="menu-btn" onclick="generateMenu()">
+            <span id="menu-btn-text">📅 Generate 2-Week Menu</span>
+          </button>
+        </div>
+        <div class="card">
+          <div class="card-title" style="font-size:1.1em;">📧 Email My Menu</div>
+          <div class="card-sub" style="margin-bottom:14px;">Send the meal plan to your Gmail inbox.</div>
+          <div class="field">
+            <label>Your email</label>
+            <input type="email" id="email-input" placeholder="yourname@gmail.com">
+          </div>
+          <button class="btn btn-primary" onclick="sendEmail()" id="send-btn">
+            <span id="send-btn-text">📨 Send to My Email</span>
+          </button>
+          <div class="auto-schedule" style="margin-top:12px;">⏰ Auto-sends every 2 weeks once backend scheduler is configured.</div>
+        </div>
+      </div>
+      <div id="menu-display">
+        <div class="card"><div class="results-empty"><div class="big">📅</div><p>Generate your 2-week meal plan to see it here</p></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SAVED PANEL -->
+  <div class="panel" id="panel-saved">
+    <div id="saved-area">
+      <div class="card"><div class="empty-saved"><div class="big">♥</div><p>No saved recipes yet.<br>Find a recipe and save it!</p></div></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────
+const API = 'https://recipe-app-5fxc.onrender.com/api/v1';
+let addedIngredients = [];
+let currentRecipes   = [];
+let savedRecipes     = JSON.parse(localStorage.getItem('savedRecipes') || '[]');
+let currentMenu      = null;
+let isVegan          = false;
+
+// ── Ingredient Pairing Database ──────────────────────────────────────────
+const PAIRINGS = {
+  rice:      [{ name:'eggs', why:'classic fried rice', icon:'🥚' }, { name:'soy sauce', why:'adds umami depth', icon:'🫙' }, { name:'ginger', why:'aromatic base', icon:'🫚' }, { name:'peas', why:'colour & sweetness', icon:'🟢' }, { name:'garlic', why:'essential flavour', icon:'🧄' }],
+  eggs:      [{ name:'tomato', why:'classic combo', icon:'🍅' }, { name:'onion', why:'flavour base', icon:'🧅' }, { name:'spinach', why:'nutrition boost', icon:'🥬' }, { name:'cheese', why:'richness', icon:'🧀' }, { name:'butter', why:'creamy texture', icon:'🧈' }],
+  pasta:     [{ name:'garlic', why:'aromatic base', icon:'🧄' }, { name:'tomato', why:'classic sauce', icon:'🍅' }, { name:'basil', why:'fresh herb', icon:'🌿' }, { name:'olive oil', why:'authentic flavour', icon:'🫒' }, { name:'parmesan', why:'salty finish', icon:'🧀' }],
+  chicken:   [{ name:'lemon', why:'brightens flavour', icon:'🍋' }, { name:'garlic', why:'pairs perfectly', icon:'🧄' }, { name:'rosemary', why:'aromatic herb', icon:'🌿' }, { name:'potato', why:'hearty side', icon:'🥔' }, { name:'thyme', why:'classic pairing', icon:'🌱' }],
+  tomato:    [{ name:'basil', why:'Italian classic', icon:'🌿' }, { name:'garlic', why:'flavour depth', icon:'🧄' }, { name:'onion', why:'base flavour', icon:'🧅' }, { name:'olive oil', why:'carries flavour', icon:'🫒' }, { name:'mozzarella', why:'caprese classic', icon:'🧀' }],
+  paneer:    [{ name:'spinach', why:'palak paneer classic', icon:'🥬' }, { name:'tomato', why:'gravy base', icon:'🍅' }, { name:'onion', why:'essential', icon:'🧅' }, { name:'garam masala', why:'Indian spice', icon:'🫙' }, { name:'ginger', why:'aromatic depth', icon:'🫚' }],
+  spinach:   [{ name:'garlic', why:'perfect match', icon:'🧄' }, { name:'lemon', why:'cuts bitterness', icon:'🍋' }, { name:'paneer', why:'protein + iron', icon:'🥛' }, { name:'nutmeg', why:'enhances flavour', icon:'🌰' }, { name:'eggs', why:'eggs florentine', icon:'🥚' }],
+  garlic:    [{ name:'olive oil', why:'infuse together', icon:'🫒' }, { name:'lemon', why:'bright contrast', icon:'🍋' }, { name:'parsley', why:'fresh finish', icon:'🌿' }, { name:'butter', why:'garlic butter', icon:'🧈' }, { name:'chili', why:'heat + depth', icon:'🌶️' }],
+  potato:    [{ name:'rosemary', why:'roasted potatoes', icon:'🌿' }, { name:'garlic', why:'essential', icon:'🧄' }, { name:'butter', why:'creamy mash', icon:'🧈' }, { name:'paprika', why:'smoky spuds', icon:'🫙' }, { name:'chives', why:'classic garnish', icon:'🌱' }],
+  onion:     [{ name:'garlic', why:'flavour base', icon:'🧄' }, { name:'tomato', why:'classic combo', icon:'🍅' }, { name:'ginger', why:'Indian base', icon:'🫚' }, { name:'cumin', why:'adds warmth', icon:'🫙' }, { name:'vinegar', why:'sweet-sour balance', icon:'🍶' }],
+  banana:    [{ name:'oats', why:'filling breakfast', icon:'🌾' }, { name:'honey', why:'natural sweetness', icon:'🍯' }, { name:'peanut butter', why:'protein boost', icon:'🥜' }, { name:'cinnamon', why:'warm spice', icon:'🫙' }, { name:'milk', why:'smoothie base', icon:'🥛' }],
+  mushroom:  [{ name:'garlic', why:'classic pairing', icon:'🧄' }, { name:'thyme', why:'earthy herbs', icon:'🌿' }, { name:'butter', why:'rich sauté', icon:'🧈' }, { name:'parsley', why:'fresh finish', icon:'🌿' }, { name:'soy sauce', why:'umami boost', icon:'🫙' }],
+  tofu:      [{ name:'soy sauce', why:'essential seasoning', icon:'🫙' }, { name:'ginger', why:'Asian flavour', icon:'🫚' }, { name:'sesame oil', why:'nutty finish', icon:'🫙' }, { name:'garlic', why:'aromatic base', icon:'🧄' }, { name:'broccoli', why:'balanced meal', icon:'🥦' }],
+  chickpea:  [{ name:'lemon', why:'brightens dish', icon:'🍋' }, { name:'cumin', why:'earthy depth', icon:'🫙' }, { name:'garlic', why:'essential', icon:'🧄' }, { name:'tahini', why:'hummus classic', icon:'🫙' }, { name:'paprika', why:'smoky note', icon:'🫙' }],
+  lentil:    [{ name:'cumin', why:'classic spice', icon:'🫙' }, { name:'turmeric', why:'colour + health', icon:'🫙' }, { name:'tomato', why:'tangy base', icon:'🍅' }, { name:'ginger', why:'warming spice', icon:'🫚' }, { name:'coconut milk', why:'creamy dal', icon:'🥥' }],
+  bread:     [{ name:'butter', why:'always works', icon:'🧈' }, { name:'cheese', why:'grilled cheese', icon:'🧀' }, { name:'garlic', why:'garlic bread', icon:'🧄' }, { name:'avocado', why:'trendy toast', icon:'🥑' }, { name:'eggs', why:'egg on toast', icon:'🥚' }],
+};
+
+const VEGAN_ONLY = ['tofu','tempeh','chickpea','lentil','beans','oats','quinoa','avocado','tahini','coconut milk','almond milk','nutritional yeast'];
+const ALL_INGREDIENTS = [...new Set([...Object.keys(PAIRINGS), ...Object.values(PAIRINGS).flat().map(p => p.name)])];
+
+// ── Tag Input System ──────────────────────────────────────────────────────
+function focusTagInput() { document.getElementById('tag-input').focus(); }
+
+function handleIngredientInput(val) {
+  val = val.trim().toLowerCase();
+  if (!val) { hideSuggestions(); return; }
+  showSuggestions(val);
+}
+
+function handleIngredientKeydown(e) {
+  const input = e.target;
+  const val   = input.value.trim();
+
+  if ((e.key === 'Enter' || e.key === ',') && val) {
+    e.preventDefault();
+    addIngredient(val);
+    input.value = '';
+    hideSuggestions();
+  }
+  if (e.key === 'Backspace' && !val && addedIngredients.length) {
+    removeIngredient(addedIngredients.length - 1);
+  }
+}
+
+function addIngredient(name) {
+  name = name.replace(/,$/, '').trim().toLowerCase();
+  if (!name || addedIngredients.includes(name)) return;
+  addedIngredients.push(name);
+  renderTags();
+  document.getElementById('tag-input').value = '';
+
+  // Show what pairs with this ingredient
+  if (PAIRINGS[name]) showSuggestionsForAdded(name);
+  else hideSuggestions();
+}
+
+function removeIngredient(index) {
+  addedIngredients.splice(index, 1);
+  renderTags();
+  hideSuggestions();
+}
+
+function renderTags() {
+  const container = document.getElementById('tag-container');
+  const input     = document.getElementById('tag-input');
+  container.innerHTML = '';
+
+  addedIngredients.forEach((ing, i) => {
+    const pill = document.createElement('div');
+    pill.className = 'tag-pill';
+    pill.innerHTML = `${ing} <span class="remove" onclick="removeIngredient(${i})">✕</span>`;
+    container.appendChild(pill);
+  });
+
+  container.appendChild(input);
+  input.focus();
+}
+
+function loadPreset(ingredients) {
+  addedIngredients = [...ingredients];
+  renderTags();
+  hideSuggestions();
+  toast('✓ Ingredients loaded — click Find Recipes!');
+}
+
+// ── Suggestions System ────────────────────────────────────────────────────
+function showSuggestions(query) {
+  const box = document.getElementById('suggestions-box');
+
+  // Match ingredient names
+  const matches = ALL_INGREDIENTS
+    .filter(i => i.includes(query) && !addedIngredients.includes(i))
+    .slice(0, 4);
+
+  // Pairings for already-added ingredients
+  let pairings = [];
+  addedIngredients.forEach(ing => {
+    if (PAIRINGS[ing]) {
+      PAIRINGS[ing].forEach(p => {
+        if (!addedIngredients.includes(p.name) && !pairings.find(x => x.name === p.name)) {
+          pairings.push({ ...p, basedOn: ing });
+        }
+      });
+    }
+  });
+  // Filter pairings by query too
+  const filteredPairings = query.length > 1
+    ? pairings.filter(p => p.name.includes(query))
+    : pairings.slice(0, 4);
+
+  if (!matches.length && !filteredPairings.length) { hideSuggestions(); return; }
+
+  let html = '';
+
+  if (matches.length) {
+    html += `<div class="suggestion-section"><div class="suggestion-section-title">Ingredients</div>`;
+    matches.forEach(m => {
+      const isVeganIng = VEGAN_ONLY.includes(m);
+      html += `<div class="suggestion-item" onclick="addIngredient('${m}')">
+        <span class="sug-icon">${getIngredientEmoji(m)}</span>
+        <span class="sug-text">${m}${isVeganIng ? ' 🌱' : ''}</span>
+        <span class="sug-add">+ Add</span>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  if (filteredPairings.length) {
+    if (matches.length) html += '<div class="suggestion-divider"></div>';
+    html += `<div class="suggestion-section"><div class="suggestion-section-title">🤝 Pairs well with your ingredients</div>`;
+    filteredPairings.forEach(p => {
+      html += `<div class="suggestion-item" onclick="addIngredient('${p.name}')">
+        <span class="sug-icon">${p.icon}</span>
+        <div class="sug-text">
+          <div>${p.name}</div>
+          <div class="sug-why">${p.why} · goes with ${p.basedOn}</div>
+        </div>
+        <span class="sug-add">+ Add</span>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  box.innerHTML = html;
+  box.classList.add('open');
+}
+
+function showSuggestionsForAdded(ingredient) {
+  const box      = document.getElementById('suggestions-box');
+  const pairings = PAIRINGS[ingredient] || [];
+  const filtered = pairings.filter(p => !addedIngredients.includes(p.name));
+  if (!filtered.length) { hideSuggestions(); return; }
+
+  const html = `
+    <div class="suggestion-section">
+      <div class="suggestion-section-title">✨ Goes well with ${ingredient}</div>
+      ${filtered.slice(0,5).map(p => `
+        <div class="suggestion-item" onclick="addIngredient('${p.name}')">
+          <span class="sug-icon">${p.icon}</span>
+          <div class="sug-text">
+            <div>${p.name}</div>
+            <div class="sug-why">${p.why}</div>
+          </div>
+          <span class="sug-add">+ Add</span>
+        </div>
+      `).join('')}
+    </div>`;
+
+  box.innerHTML = html;
+  box.classList.add('open');
+}
+
+function hideSuggestions()       { document.getElementById('suggestions-box').classList.remove('open'); }
+function hideSuggestionsDelayed(){ setTimeout(hideSuggestions, 180); }
+
+function getIngredientEmoji(name) {
+  const map = { rice:'🍚', eggs:'🥚', tomato:'🍅', onion:'🧅', garlic:'🧄', spinach:'🥬', pasta:'🍝', chicken:'🍗', potato:'🥔', bread:'🍞', cheese:'🧀', butter:'🧈', banana:'🍌', mushroom:'🍄', tofu:'🫘', chickpea:'🧆', lentil:'🥣', paneer:'🥛', ginger:'🫚', lemon:'🍋', milk:'🥛', oats:'🌾', avocado:'🥑', broccoli:'🥦' };
+  return map[name] || '🥄';
+}
+
+// ── Vegan Toggle ──────────────────────────────────────────────────────────
+function toggleVegan() {
+  isVegan = !isVegan;
+  const row    = document.getElementById('vegan-toggle');
+  const status = document.getElementById('vegan-status');
+  const btn    = document.getElementById('find-btn');
+
+  row.classList.toggle('active', isVegan);
+  status.textContent = isVegan ? 'ON' : 'OFF';
+  btn.classList.toggle('vegan-mode', isVegan);
+  document.getElementById('find-btn-text').textContent = isVegan ? '🌱 Find Vegan Recipes' : '🔍 Find Recipes';
+  toast(isVegan ? '🌱 Vegan mode on — plant-based only!' : 'Vegan mode off');
+}
+
+// ── Find Recipes ──────────────────────────────────────────────────────────
+async function findRecipes() {
+  if (!addedIngredients.length) { toast('Please add at least one ingredient'); return; }
+
+  const ingredients = addedIngredients.join(', ');
+  const cuisine     = document.getElementById('cuisine').value;
+  const maxTime     = document.getElementById('maxTime').value;
+
+  setLoading('find-btn', 'find-btn-text', true, 'Finding recipes...');
+  showLoadingState('results-area', isVegan ? '🌱 Finding vegan recipes...' : '🧠 Asking AI for recipes...');
+
+  try {
+    const res = await fetch(`${API}/recipes/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ingredients, cuisine, maxTime, vegan: isVegan })
+    });
+    const data = await res.json();
+    currentRecipes = data.recipes || [];
+    renderRecipes(currentRecipes, ingredients);
+    toast(`🍳 Found ${currentRecipes.length} recipes!`);
+  } catch {
+    currentRecipes = getMockRecipes(ingredients, isVegan);
+    renderRecipes(currentRecipes, ingredients);
+    toast('📱 Demo mode — start Spring Boot to use real AI');
+  } finally {
+    setLoading('find-btn', 'find-btn-text', false, isVegan ? '🌱 Find Vegan Recipes' : '🔍 Find Recipes');
+  }
+}
+
+function renderRecipes(recipes, ingredients) {
+  const area = document.getElementById('results-area');
+  if (!recipes.length) {
+    area.innerHTML = '<div class="card"><div class="results-empty"><div class="big">😕</div><p>No recipes found. Try different ingredients.</p></div></div>';
+    return;
+  }
+  area.innerHTML = `<div class="recipes-grid">${recipes.map((r,i) => recipeCardHtml(r,i,ingredients)).join('')}</div>`;
+
+  // Animate nutrition bars after render
+  setTimeout(() => {
+    document.querySelectorAll('.nutrient-bar').forEach(bar => {
+      bar.style.width = bar.dataset.pct + '%';
+    });
+  }, 100);
+}
+
+function recipeCardHtml(recipe, index, inputIngredients) {
+  const vegan    = recipe.isVegan || isVegan;
+  const ingList  = Array.isArray(recipe.ingredients) ? recipe.ingredients : (recipe.ingredients||'').split(',').map(s=>s.trim());
+  const stepsList= Array.isArray(recipe.instructions) ? recipe.instructions : (recipe.instructions||'').split('.').filter(s=>s.trim());
+  const nutrition= recipe.nutrition || estimateNutrition(recipe, vegan);
+  const encoded  = encodeURIComponent(JSON.stringify(recipe).replace(/'/g,"\\'"));
+
+  return `
+    <div class="recipe-card ${vegan ? 'is-vegan' : ''}">
+      <div class="recipe-card-header">
+        <h3>${recipe.name || 'Recipe '+(index+1)}</h3>
+        <div class="recipe-meta">
+          ${vegan ? '<span class="meta-pill vegan-pill">🌱 Vegan</span>' : ''}
+          <span class="meta-pill">⏱ ${recipe.cookingTime||'—'}</span>
+          <span class="meta-pill">🌍 ${recipe.cuisine||'—'}</span>
+        </div>
+      </div>
+      <div class="recipe-card-body">
+
+        <div class="recipe-section">
+          <div class="recipe-section-title">Ingredients</div>
+          <div class="ingredients-list">
+            ${ingList.map(i=>`<span class="ingredient-tag">${i}</span>`).join('')}
+          </div>
+        </div>
+
+        <div class="recipe-section">
+          <div class="recipe-section-title">Instructions</div>
+          <ol class="steps-list">
+            ${stepsList.slice(0,5).map((step,i)=>`
+              <li>
+                <span class="step-num">${i+1}</span>
+                <span>${step.replace(/^step\s*\d+[:.]\s*/i,'')}</span>
+              </li>
+            `).join('')}
+          </ol>
+        </div>
+
+        <!-- NUTRITION PANEL -->
+        <div class="nutrition-panel ${vegan ? 'vegan-nutrition' : ''}">
+          <div class="nutrition-title">
+            📊 Nutrition per serving
+            ${vegan ? '<span style="font-size:0.85em;color:var(--vegan);">· Plant-based</span>' : ''}
+          </div>
+          <div class="nutrition-grid">
+            ${nutrientItem('Calories', nutrition.calories, 'kcal', nutrition.calPct, 'bar-cal')}
+            ${nutrientItem('Protein',  nutrition.protein,  'g',    nutrition.protPct,  'bar-prot')}
+            ${nutrientItem('Carbs',    nutrition.carbs,    'g',    nutrition.carbPct,  'bar-carb')}
+            ${nutrientItem('Fat',      nutrition.fat,      'g',    nutrition.fatPct,   'bar-fat')}
+            ${nutrientItem('Fiber',    nutrition.fiber,    'g',    nutrition.fiberPct, 'bar-fiber')}
+          </div>
+          <div class="nutrition-dv">
+            ${nutrition.tags.map(t=>`<span class="dv-tag ${t.type}">${t.label}</span>`).join('')}
+          </div>
+        </div>
+
+        ${recipe.tip ? `<div class="tip-box">💡 ${recipe.tip}</div>` : ''}
+      </div>
+
+      <div class="recipe-card-footer">
+        <div class="footer-left">
+          ${vegan ? '<span style="font-size:0.8em;color:var(--vegan);">🌱 100% Plant-based</span>' : ''}
+        </div>
+        <button class="btn btn-outline" onclick="saveRecipeLocally('${encoded}','${inputIngredients.replace(/'/g,"\\'")}',${vegan})">♥ Save Recipe</button>
+      </div>
+    </div>`;
+}
+
+function nutrientItem(label, value, unit, pct, barClass) {
+  return `
+    <div class="nutrient-item">
+      <div class="nutrient-bar-wrap">
+        <div class="nutrient-bar ${barClass}" data-pct="${pct}" style="width:0%"></div>
+      </div>
+      <div class="nutrient-value">${value}<span style="font-size:0.55em;font-weight:400;">${unit}</span></div>
+      <div class="nutrient-label">${label}</div>
+    </div>`;
+}
+
+function estimateNutrition(recipe, vegan) {
+  // Simple estimation based on recipe type & vegan flag
+  const base = vegan
+    ? { cal: 280, prot: 12, carb: 38, fat: 8, fiber: 8 }
+    : { cal: 380, prot: 22, carb: 35, fat: 14, fiber: 4 };
+
+  const variance = (n, v) => Math.round(n + (Math.random() - 0.5) * v);
+  const cal   = variance(base.cal, 80);
+  const prot  = variance(base.prot, 6);
+  const carb  = variance(base.carb, 10);
+  const fat   = variance(base.fat, 5);
+  const fiber = variance(base.fiber, 3);
+
+  const tags = [];
+  if (prot >= 20)  tags.push({ label: '✓ High Protein', type: 'good' });
+  if (fiber >= 6)  tags.push({ label: '✓ High Fibre', type: 'good' });
+  if (cal < 300)   tags.push({ label: '✓ Low Calorie', type: 'good' });
+  if (fat > 18)    tags.push({ label: '⚠ High Fat', type: 'warn' });
+  if (carb > 45)   tags.push({ label: '⚠ High Carb', type: 'warn' });
+  if (vegan)       tags.push({ label: '🌱 Plant-based', type: 'good' });
+
+  return {
+    calories: cal,  calPct:   Math.min(Math.round(cal/20),  100),
+    protein:  prot, protPct:  Math.min(Math.round(prot*2),  100),
+    carbs:    carb, carbPct:  Math.min(Math.round(carb/0.6),100),
+    fat:      fat,  fatPct:   Math.min(Math.round(fat*3),   100),
+    fiber:    fiber,fiberPct: Math.min(Math.round(fiber*8), 100),
+    tags
+  };
+}
+
+// ── Save Recipe ──────────────────────────────────────────────────────────
+async function saveRecipeLocally(encodedRecipe, inputIngredients, vegan) {
+  const recipe = JSON.parse(decodeURIComponent(encodedRecipe));
+  try {
+    await fetch(`${API}/recipes/save`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ name:recipe.name, ingredients:JSON.stringify(recipe.ingredients), instructions:JSON.stringify(recipe.instructions), cookingTime:recipe.cookingTime, cuisine:recipe.cuisine, calories:recipe.calories, inputIngredients, isVegan: vegan })
+    });
+  } catch {}
+  if (!savedRecipes.find(r => r.name === recipe.name)) {
+    savedRecipes.push({ ...recipe, inputIngredients, isVegan: vegan, savedAt: new Date().toISOString() });
+    localStorage.setItem('savedRecipes', JSON.stringify(savedRecipes));
+  }
+  toast('♥ Recipe saved!');
+}
+
+// ── Saved Panel ──────────────────────────────────────────────────────────
+function renderSaved() {
+  const area = document.getElementById('saved-area');
+  if (!savedRecipes.length) {
+    area.innerHTML = '<div class="card"><div class="empty-saved"><div class="big">♥</div><p>No saved recipes yet.<br>Find a recipe and save it!</p></div></div>';
+    return;
+  }
+  area.innerHTML = `
+    <div class="card" style="margin-bottom:24px;">
+      <div class="card-title">Your Saved Recipes</div>
+      <div class="card-sub">${savedRecipes.length} recipe${savedRecipes.length>1?'s':''} saved · ${savedRecipes.filter(r=>r.isVegan).length} vegan</div>
+    </div>
+    <div class="saved-grid">
+      ${savedRecipes.map((r,i) => `
+        <div class="saved-card ${r.isVegan?'vegan-saved':''}">
+          <h3>${r.name}</h3>
+          <div class="saved-card-meta">
+            ${r.isVegan ? '<span class="saved-meta-badge vegan-badge">🌱 Vegan</span>' : ''}
+            <span class="saved-meta-badge">⏱ ${r.cookingTime||'—'}</span>
+            <span class="saved-meta-badge">🌍 ${r.cuisine||'—'}</span>
+            ${r.calories ? `<span class="saved-meta-badge">🔥 ${r.calories}</span>` : ''}
+          </div>
+          <div style="font-size:0.82em;color:var(--muted);line-height:1.5;">From: ${r.inputIngredients||'—'}</div>
+          <div class="saved-card-footer">
+            <span class="saved-date">${r.savedAt ? new Date(r.savedAt).toLocaleDateString('en-IN',{day:'numeric',month:'short'}) : ''}</span>
+            <button class="btn btn-danger" onclick="deleteSaved(${i})">🗑 Remove</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>`;
+}
+
+function deleteSaved(i) {
+  savedRecipes.splice(i,1);
+  localStorage.setItem('savedRecipes', JSON.stringify(savedRecipes));
+  renderSaved();
+  toast('Recipe removed');
+}
+
+// ── Menu ─────────────────────────────────────────────────────────────────
+async function generateMenu() {
+  const pref = document.getElementById('diet-pref').value;
+  setLoading('menu-btn','menu-btn-text',true,'Generating plan...');
+  showMenuLoading();
+  try {
+    const res = await fetch(`${API}/menu/generate`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ preferences: pref })
+    });
+    currentMenu = await res.json();
+    renderMenu(currentMenu);
+    toast('📅 2-week menu ready!');
+  } catch {
+    currentMenu = getMockMenu();
+    renderMenu(currentMenu);
+    toast('📱 Demo mode — start Spring Boot to use real AI');
+  } finally {
+    setLoading('menu-btn','menu-btn-text',false,'📅 Generate 2-Week Menu');
+  }
+}
+
+function renderMenu(plan) {
+  const display = document.getElementById('menu-display');
+  const buildWeek = (days, label) => {
+    if (!days||!days.length) return '';
+    return `
+      <div class="week-title">${label}</div>
+      <table class="plan-table">
+        <thead><tr><th>Day</th><th>☀️ Breakfast</th><th>🌤️ Lunch</th><th>🌙 Dinner</th></tr></thead>
+        <tbody>${days.map(d=>`<tr><td>${d.day}</td><td>${d.breakfast}</td><td>${d.lunch}</td><td>${d.dinner}</td></tr>`).join('')}</tbody>
+      </table>`;
+  };
+  const buildShopping = s => {
+    if (!s) return '';
+    const list = items => items.map(i=>`<div class="shopping-item"><div class="shopping-check" onclick="this.classList.toggle('checked')"></div>${i}</div>`).join('');
+    return `<div class="week-title" style="margin-top:8px;">🛒 Shopping Lists</div>
+      <div class="shopping-cols">
+        ${s.week1?`<div class="shopping-card"><h4>Week 1</h4>${list(s.week1)}</div>`:''}
+        ${s.week2?`<div class="shopping-card"><h4>Week 2</h4>${list(s.week2)}</div>`:''}
+      </div>`;
+  };
+  const buildTips = tips => tips ? `<div class="week-title" style="margin-top:8px;">💡 Nutrition Tips</div>${tips.map(t=>`<div class="tip-item">${t}</div>`).join('')}` : '';
+
+  display.innerHTML = `<div class="card">${buildWeek(plan.week1,'📅 Week 1')}${buildWeek(plan.week2,'📅 Week 2')}${buildShopping(plan.shoppingList)}${buildTips(plan.nutritionTips)}</div>`;
+}
+
+async function sendEmail() {
+  const email = document.getElementById('email-input').value.trim();
+  if (!email||!email.includes('@')) { toast('Please enter a valid email'); return; }
+  if (!currentMenu) { toast('Generate a menu first!'); return; }
+  setLoading('send-btn','send-btn-text',true,'Sending...');
+  try {
+    const res = await fetch(`${API}/menu/send-email`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    toast(data.success ? '📧 Menu sent to '+email+'!' : '❌ '+(data.error||'Failed to send'));
+  } catch {
+    toast('📱 Demo mode — email works once Spring Boot is running');
+  } finally {
+    setLoading('send-btn','send-btn-text',false,'📨 Send to My Email');
+  }
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────
+function showPanel(name, btn) {
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  btn.classList.add('active');
+  if (name==='saved') renderSaved();
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function setLoading(btnId, textId, loading, text) {
+  document.getElementById(btnId).disabled = loading;
+  document.getElementById(textId).innerHTML = loading ? `<span class="spinner"></span> ${text}` : text;
+}
+function showLoadingState(id, msg='Thinking...') {
+  document.getElementById(id).innerHTML=`<div class="card"><div class="loading-state"><div class="spin-big"></div><p>${msg}</p></div></div>`;
+}
+function showMenuLoading() {
+  document.getElementById('menu-display').innerHTML=`<div class="card"><div class="loading-state"><div class="spin-big"></div><p>Crafting your 2-week meal plan...</p></div></div>`;
+}
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=>el.classList.remove('show'), 2800);
+}
+
+// ── Mock Data ─────────────────────────────────────────────────────────────
+function getMockRecipes(ingredients, vegan) {
+  if (vegan) return [
+    { name:'Spiced Tofu & Vegetable Stir-Fry', cookingTime:'15 mins', cuisine:'Asian', calories:'290 kcal', isVegan:true, ingredients:['tofu','broccoli','soy sauce','ginger','garlic','sesame oil'], instructions:['Step 1: Press tofu dry and cube it', 'Step 2: Stir-fry broccoli in sesame oil for 3 mins', 'Step 3: Add tofu and brown on all sides', 'Step 4: Add garlic, ginger and soy sauce', 'Step 5: Toss everything together and serve'], tip:'Pressing tofu removes moisture and makes it crispy!' },
+    { name:'Chickpea & Spinach Curry', cookingTime:'20 mins', cuisine:'Indian', calories:'310 kcal', isVegan:true, ingredients:['chickpea','spinach','tomato','onion','cumin','turmeric'], instructions:['Step 1: Sauté onion until golden', 'Step 2: Add cumin and turmeric', 'Step 3: Add tomatoes and cook down', 'Step 4: Stir in chickpeas and spinach', 'Step 5: Simmer 10 mins and season'], tip:'Use canned chickpeas to save time — same great result!' },
+    { name:'Avocado & Lemon Rice Bowl', cookingTime:'10 mins', cuisine:'Fusion', calories:'420 kcal', isVegan:true, ingredients:['rice','avocado','lemon','garlic','olive oil','salt'], instructions:['Step 1: Cook rice as normal', 'Step 2: Slice avocado', 'Step 3: Make dressing: lemon, olive oil, garlic', 'Step 4: Bowl the rice, top with avocado', 'Step 5: Drizzle dressing and season'], tip:'Add seeds or nuts for extra crunch and nutrition!' },
+  ];
+  return [
+    { name:'Egg Fried Rice', cookingTime:'15 mins', cuisine:'Chinese', calories:'380 kcal', isVegan:false, ingredients:['rice','eggs','onion','soy sauce','oil'], instructions:['Step 1: Heat oil in a wok on high heat','Step 2: Add onion and stir-fry 2 minutes','Step 3: Push to side, scramble eggs in centre','Step 4: Add cooked rice and mix together','Step 5: Season with soy sauce and serve hot'], tip:'Day-old rice works best — fresh rice gets mushy!' },
+    { name:'Tomato Omelette', cookingTime:'10 mins', cuisine:'Any', calories:'250 kcal', isVegan:false, ingredients:['eggs','tomato','onion','salt','oil'], instructions:['Step 1: Dice tomato and onion finely','Step 2: Beat 3 eggs with a pinch of salt','Step 3: Sauté vegetables for 1 min','Step 4: Pour egg mixture over vegetables','Step 5: Fold and serve when set'], tip:'Add fresh coriander for extra flavour!' },
+    { name:'Spiced Tomato Rice', cookingTime:'20 mins', cuisine:'Indian', calories:'310 kcal', isVegan:false, ingredients:['rice','tomato','onion','cumin','oil'], instructions:['Step 1: Heat oil and add cumin seeds','Step 2: Add onion and fry until golden','Step 3: Add tomatoes and cook until soft','Step 4: Add cooked rice and mix gently','Step 5: Season and serve with raita'], tip:'Use leftover rice to save time!' },
+  ];
+}
+
+function getMockMenu() {
+  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const B  = ['Vegetable Poha','Besan Chilla','Idli Sambar','Oats Porridge','Paratha','Upma','Paneer Toast'];
+  const L  = ['Dal Tadka + Rice','Rajma Chawal','Chole + Rice','Veg Pulao','Paneer Curry','Aloo Matar','Mixed Veg + Roti'];
+  const D  = ['Palak Paneer','Egg Curry + Rice','Lentil Soup','Aloo Chapati','Paneer Bhurji','Dal Khichdi','Veg Fried Rice'];
+  return {
+    week1: days.map((d,i)=>({day:d,breakfast:B[i],lunch:L[i],dinner:D[i]})),
+    week2: days.map((d,i)=>({day:d,breakfast:B[(i+3)%7],lunch:L[(i+2)%7],dinner:D[(i+4)%7]})),
+    shoppingList:{week1:['Rice 2kg','Dal 500g','Paneer 400g','Onions 8','Tomatoes 10','Eggs 12','Spinach 500g'],week2:['Rice 1.5kg','Dal 400g','Paneer 300g','Onions 6','Chickpeas 400g','Broccoli 1','Peas 300g']},
+    nutritionTips:['Include protein in every meal — dal, paneer, eggs, or legumes.','Eat colourful vegetables across the week for complete micronutrients.','Stay hydrated — 8 glasses of water daily.']
+  };
+}
+</script>
+</body>
+</html>
