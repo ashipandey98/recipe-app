@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: recipe-app
+  datasource:
+    url: jdbc:h2:mem:recipedb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+  h2:
+    console:
+      enabled: false
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${GMAIL_USERNAME}
+    password: ${GMAIL_APP_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+server:
+  port: ${PORT:8080}
+  servlet:
+    context-path: /api/v1
+app:
+  gemini:
+    api-key: ${GROQ_API_KEY}
+    url: https://api.groq.com/openai/v1/chat/completions
+  menu:
+    recipient-email: ${MENU_RECIPIENT_EMAIL}
+    schedule: "0 0 8 1/14 * *"
+logging:
+  level:
+    root: WARN
+    com.recipe: INFO
